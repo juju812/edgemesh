@@ -64,6 +64,11 @@ type Config struct {
 	// Set it via the UserAgent option function.
 	UserAgent string
 
+	// ProtocolVersion is the protocol version that identifies the family
+	// of protocols used by the peer in the Identify protocol. It is set
+	// using the [ProtocolVersion] option.
+	ProtocolVersion string
+
 	PeerKey crypto.PrivKey
 
 	Transports         []TptC
@@ -150,6 +155,9 @@ func (cfg *Config) makeSwarm() (*swarm.Swarm, error) {
 	if cfg.ResourceManager != nil {
 		opts = append(opts, swarm.WithResourceManager(cfg.ResourceManager))
 	}
+	if cfg.MultiaddrResolver != nil {
+		opts = append(opts, swarm.WithMultiaddrResolver(cfg.MultiaddrResolver))
+	}
 	// TODO: Make the swarm implementation configurable.
 	return swarm.NewSwarm(pid, cfg.Peerstore, opts...)
 }
@@ -188,7 +196,7 @@ func (cfg *Config) addTransports(h host.Host) error {
 	if err != nil {
 		return err
 	}
-	tpts, err := makeTransports(h, upgrader, cfg.ConnectionGater, cfg.PSK, cfg.ResourceManager, cfg.Transports)
+	tpts, err := makeTransports(h, upgrader, cfg.ConnectionGater, cfg.PSK, cfg.ResourceManager, cfg.MultiaddrResolver, cfg.Transports)
 	if err != nil {
 		return err
 	}
@@ -223,7 +231,7 @@ func (cfg *Config) NewNode() (host.Host, error) {
 		NATManager:          cfg.NATManager,
 		EnablePing:          !cfg.DisablePing,
 		UserAgent:           cfg.UserAgent,
-		MultiaddrResolver:   cfg.MultiaddrResolver,
+		ProtocolVersion:     cfg.ProtocolVersion,
 		EnableHolePunching:  cfg.EnableHolePunching,
 		HolePunchingOptions: cfg.HolePunchingOptions,
 		EnableRelayService:  cfg.EnableRelayService,

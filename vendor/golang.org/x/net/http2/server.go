@@ -1371,6 +1371,9 @@ func (sc *serverConn) startGracefulShutdownInternal() {
 func (sc *serverConn) goAway(code ErrCode) {
 	sc.serveG.check()
 	if sc.inGoAway {
+		if sc.goAwayCode == ErrCodeNo {
+			sc.goAwayCode = code
+		}
 		return
 	}
 	sc.inGoAway = true
@@ -2096,12 +2099,6 @@ func (sc *serverConn) newWriterAndRequest(st *stream, f *MetaHeadersFrame) (*res
 		return nil, nil, sc.countError("bad_path_method", streamError(f.StreamID, ErrCodeProtocol))
 	}
 
-	bodyOpen := !f.StreamEnded()
-	if rp.method == "HEAD" && bodyOpen {
-		// HEAD requests can't have bodies
-		return nil, nil, sc.countError("head_body", streamError(f.StreamID, ErrCodeProtocol))
-	}
-
 	rp.header = make(http.Header)
 	for _, hf := range f.RegularFields() {
 		rp.header.Add(sc.canonicalHeader(hf.Name), hf.Value)
@@ -2114,6 +2111,7 @@ func (sc *serverConn) newWriterAndRequest(st *stream, f *MetaHeadersFrame) (*res
 	if err != nil {
 		return nil, nil, err
 	}
+	bodyOpen := !f.StreamEnded()
 	if bodyOpen {
 		if vv, ok := rp.header["Content-Length"]; ok {
 			if cl, err := strconv.ParseUint(vv[0], 10, 63); err == nil {
@@ -2502,6 +2500,10 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 		rws.writeHeader(200)
 	}
 
+	if rws.handlerDone {
+		rws.promoteUndeclaredTrailers()
+	}
+
 	isHeadResp := rws.req.Method == "HEAD"
 	if !rws.sentHeader {
 		rws.sentHeader = true
@@ -2571,10 +2573,6 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 	}
 	if len(p) == 0 && !rws.handlerDone {
 		return 0, nil
-	}
-
-	if rws.handlerDone {
-		rws.promoteUndeclaredTrailers()
 	}
 
 	// only send trailers if they have actually been defined by the
