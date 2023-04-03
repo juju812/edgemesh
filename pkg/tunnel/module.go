@@ -160,7 +160,7 @@ func newEdgeTunnel(c *v1alpha1.EdgeTunnelConfig) (*EdgeTunnel, error) {
 			return ddht, err
 		}),
 		libp2p.EnableAutoRelay(
-			autorelay.WithPeerSource(func(numPeers int) <-chan peer.AddrInfo {
+			autorelay.WithPeerSource(func(ctx context.Context, numPeers int) <-chan peer.AddrInfo {
 				return peerSource
 			}, 15*time.Second),
 			autorelay.WithMinCandidates(0),
